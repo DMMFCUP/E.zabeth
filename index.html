@@ -3,14 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pacman Novia Virtual Interactiva</title>
+    <title>Pacman Virtual Interactiva</title>
     <style>
         body {
+            margin: 0;
+            padding: 0;
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100vh;
-            margin: 0;
+            min-height: 100vh;
             background-color: #f0f0f0;
             font-family: Arial, sans-serif;
         }
@@ -21,23 +22,84 @@
         }
         canvas {
             border: 2px solid black;
+            max-width: 100%;
         }
         #questionInput {
             margin-top: 10px;
-            width: 300px;
+            width: 80%;
+            max-width: 300px;
             padding: 5px;
         }
         #response {
             margin-top: 10px;
             font-weight: bold;
         }
+        #mobileControls {
+            display: none;
+            margin-top: 10px;
+        }
+        .controlBtn {
+            width: 60px;
+            height: 60px;
+            font-size: 24px;
+            margin: 5px;
+        }
+        #toggleGameBtn {
+            margin-top: 10px;
+        }
+        #ticTacToeGrid {
+            display: none;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 5px;
+            margin-top: 10px;
+        }
+        .cell {
+            width: 60px;
+            height: 60px;
+            font-size: 24px;
+            background-color: #fff;
+            border: 1px solid #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+        }
+        @media (max-width: 600px) {
+            #mobileControls {
+                display: flex;
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+            .cell {
+                width: 50px;
+                height: 50px;
+            }
+        }
     </style>
 </head>
 <body>
     <div id="gameContainer">
-        <canvas id="gameCanvas" width="600" height="400"></canvas>
+        <canvas id="gameCanvas"></canvas>
         <input type="text" id="questionInput" placeholder="Hazme una pregunta...">
         <div id="response"></div>
+        <div id="mobileControls">
+            <button class="controlBtn" id="upBtn">↑</button><br>
+            <button class="controlBtn" id="leftBtn">←</button>
+            <button class="controlBtn" id="rightBtn">→</button><br>
+            <button class="controlBtn" id="downBtn">↓</button>
+        </div>
+        <button id="toggleGameBtn">Jugar Tres en Raya</button>
+        <div id="ticTacToeGrid">
+            <div class="cell" data-index="0"></div>
+            <div class="cell" data-index="1"></div>
+            <div class="cell" data-index="2"></div>
+            <div class="cell" data-index="3"></div>
+            <div class="cell" data-index="4"></div>
+            <div class="cell" data-index="5"></div>
+            <div class="cell" data-index="6"></div>
+            <div class="cell" data-index="7"></div>
+            <div class="cell" data-index="8"></div>
+        </div>
     </div>
 
     <script>
@@ -45,12 +107,42 @@
         const ctx = canvas.getContext('2d');
         const questionInput = document.getElementById('questionInput');
         const responseDiv = document.getElementById('response');
+        const toggleGameBtn = document.getElementById('toggleGameBtn');
+        const ticTacToeGrid = document.getElementById('ticTacToeGrid');
+
+        let canvasWidth = 600;
+        let canvasHeight = 400;
+
+        function resizeCanvas() {
+            const maxWidth = window.innerWidth > 600 ? 600 : window.innerWidth - 20;
+            const maxHeight = window.innerHeight > 400 ? 400 : window.innerHeight - 150;
+            const aspectRatio = 3/2;
+            
+            if (maxWidth / aspectRatio > maxHeight) {
+                canvasHeight = maxHeight;
+                canvasWidth = canvasHeight * aspectRatio;
+            } else {
+                canvasWidth = maxWidth;
+                canvasHeight = canvasWidth / aspectRatio;
+            }
+            
+            canvas.width = canvasWidth;
+            canvas.height = canvasHeight;
+        }
+
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
 
         // Configuración de Pacman
-        let pacmanPos = { x: 300, y: 200 };
-        const pacmanRadius = 50;
+        let pacmanPos = { x: canvasWidth / 2, y: canvasHeight / 2 };
+        let pacmanRadius = canvasWidth / 12;
         let mouthAngle = 0;
         let mouthSpeed = 0.1;
+
+        // Configuración del Tres en Raya
+        let ticTacToeMode = false;
+        let board = ['', '', '', '', '', '', '', '', ''];
+        let currentPlayer = 'X';
 
         // Colores
         const YELLOW = '#FFFF00';
@@ -58,7 +150,7 @@
         const BLACK = '#000000';
 
         // Movimiento
-        const speed = 5;
+        const speed = canvasWidth / 120;
         let keys = {};
 
         function drawPacman() {
@@ -71,46 +163,49 @@
 
             // Ojo
             ctx.beginPath();
-            ctx.arc(pacmanPos.x + 15, pacmanPos.y - 15, 5, 0, 2 * Math.PI);
+            ctx.arc(pacmanPos.x + pacmanRadius * 0.3, pacmanPos.y - pacmanRadius * 0.3, pacmanRadius * 0.1, 0, 2 * Math.PI);
             ctx.fillStyle = BLACK;
             ctx.fill();
             ctx.closePath();
 
             // Moño
             ctx.fillStyle = PINK;
-            ctx.fillRect(pacmanPos.x - 25, pacmanPos.y - 70, 50, 20);
+            ctx.fillRect(pacmanPos.x - pacmanRadius * 0.5, pacmanPos.y - pacmanRadius * 1.4, pacmanRadius, pacmanRadius * 0.4);
             ctx.beginPath();
-            ctx.moveTo(pacmanPos.x - 25, pacmanPos.y - 60);
-            ctx.lineTo(pacmanPos.x - 40, pacmanPos.y - 40);
-            ctx.lineTo(pacmanPos.x - 10, pacmanPos.y - 50);
+            ctx.moveTo(pacmanPos.x - pacmanRadius * 0.5, pacmanPos.y - pacmanRadius * 1.2);
+            ctx.lineTo(pacmanPos.x - pacmanRadius * 0.8, pacmanPos.y - pacmanRadius * 0.8);
+            ctx.lineTo(pacmanPos.x - pacmanRadius * 0.2, pacmanPos.y - pacmanRadius);
             ctx.fill();
             ctx.beginPath();
-            ctx.moveTo(pacmanPos.x + 25, pacmanPos.y - 60);
-            ctx.lineTo(pacmanPos.x + 40, pacmanPos.y - 40);
-            ctx.lineTo(pacmanPos.x + 10, pacmanPos.y - 50);
+            ctx.moveTo(pacmanPos.x + pacmanRadius * 0.5, pacmanPos.y - pacmanRadius * 1.2);
+            ctx.lineTo(pacmanPos.x + pacmanRadius * 0.8, pacmanPos.y - pacmanRadius * 0.8);
+            ctx.lineTo(pacmanPos.x + pacmanRadius * 0.2, pacmanPos.y - pacmanRadius);
             ctx.fill();
         }
 
         function update() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            if (!ticTacToeMode) {
+                ctx.clearRect(0, 0, canvasWidth, canvasHeight);
 
-            // Mover Pacman
-            if (keys['ArrowLeft']) pacmanPos.x -= speed;
-            if (keys['ArrowRight']) pacmanPos.x += speed;
-            if (keys['ArrowUp']) pacmanPos.y -= speed;
-            if (keys['ArrowDown']) pacmanPos.y += speed;
+                // Mover Pacman
+                if (keys['ArrowLeft']) pacmanPos.x -= speed;
+                if (keys['ArrowRight']) pacmanPos.x += speed;
+                if (keys['ArrowUp']) pacmanPos.y -= speed;
+                if (keys['ArrowDown']) pacmanPos.y += speed;
 
-            // Mantener a Pacman dentro del canvas
-            pacmanPos.x = Math.max(pacmanRadius, Math.min(pacmanPos.x, canvas.width - pacmanRadius));
-            pacmanPos.y = Math.max(pacmanRadius, Math.min(pacmanPos.y, canvas.height - pacmanRadius));
+                // Mantener a Pacman dentro del canvas
+                pacmanPos.x = Math.max(pacmanRadius, Math.min(pacmanPos.x, canvasWidth - pacmanRadius));
+                pacmanPos.y = Math.max(pacmanRadius, Math.min(pacmanPos.y, canvasHeight - pacmanRadius));
 
-            // Animar la boca
-            mouthAngle += mouthSpeed;
-            if (mouthAngle > Math.PI / 4 || mouthAngle < 0) {
-                mouthSpeed = -mouthSpeed;
+                // Animar la boca
+                mouthAngle += mouthSpeed;
+                if (mouthAngle > Math.PI / 4 || mouthAngle < 0) {
+                    mouthSpeed = -mouthSpeed;
+                }
+
+                drawPacman();
             }
 
-            drawPacman();
             requestAnimationFrame(update);
         }
 
@@ -119,8 +214,79 @@
                 "hola": "¡Hola! ¿Cómo estás?",
                 "como estas": "Estoy bien, ¡gracias por preguntar!",
                 "quien eres": "Soy tu Pacman novia virtual",
+                "te quiero": "Yo también te quiero",
+                "juguemos tres en raya": "¡Claro! Haz clic en el botón 'Jugar Tres en Raya' para comenzar.",
             };
             return responses[question.toLowerCase()] || "Lo siento, no entiendo esa pregunta.";
+        }
+
+        function checkWinner() {
+            const winPatterns = [
+                [0, 1, 2], [3, 4, 5], [6, 7, 8], // Filas
+                [0, 3, 6], [1, 4, 7], [2, 5, 8], // Columnas
+                [0, 4, 8], [2, 4, 6] // Diagonales
+            ];
+
+            for (let pattern of winPatterns) {
+                if (board[pattern[0]] && board[pattern[0]] === board[pattern[1]] && board[pattern[0]] === board[pattern[2]]) {
+                    return board[pattern[0]];
+                }
+            }
+
+            if (board.every(cell => cell !== '')) {
+                return 'empate';
+            }
+
+            return null;
+        }
+
+        function makeAIMove() {
+            const emptyCells = board.reduce((acc, cell, index) => {
+                if (cell === '') acc.push(index);
+                return acc;
+            }, []);
+
+            if (emptyCells.length > 0) {
+                const randomIndex = emptyCells[Math.floor(Math.random() * emptyCells.length)];
+                board[randomIndex] = 'O';
+                document.querySelector(`.cell[data-index="${randomIndex}"]`).textContent = 'O';
+                checkGameEnd();
+            }
+        }
+
+        function checkGameEnd() {
+            const winner = checkWinner();
+            if (winner) {
+                if (winner === 'empate') {
+                    responseDiv.textContent = "¡Es un empate!";
+                } else {
+                    responseDiv.textContent = `¡${winner === 'X' ? 'Tú ganas' : 'Yo gano'}!`;
+                }
+                ticTacToeGrid.removeEventListener('click', handleCellClick);
+            } else {
+                currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
+                if (currentPlayer === 'O') {
+                    setTimeout(makeAIMove, 500);
+                }
+            }
+        }
+
+        function handleCellClick(e) {
+            const cell = e.target;
+            const index = cell.dataset.index;
+            if (board[index] === '' && currentPlayer === 'X') {
+                board[index] = 'X';
+                cell.textContent = 'X';
+                checkGameEnd();
+            }
+        }
+
+        function resetTicTacToe() {
+            board = ['', '', '', '', '', '', '', '', ''];
+            currentPlayer = 'X';
+            document.querySelectorAll('.cell').forEach(cell => cell.textContent = '');
+            ticTacToeGrid.addEventListener('click', handleCellClick);
+            responseDiv.textContent = '';
         }
 
         // Event Listeners
@@ -133,6 +299,34 @@
                 responseDiv.textContent = response;
                 questionInput.value = '';
             }
+        });
+
+        toggleGameBtn.addEventListener('click', () => {
+            ticTacToeMode = !ticTacToeMode;
+            if (ticTacToeMode) {
+                canvas.style.display = 'none';
+                ticTacToeGrid.style.display = 'grid';
+                toggleGameBtn.textContent = "Volver a Pacman";
+                resetTicTacToe();
+            } else {
+                canvas.style.display = 'block';
+                ticTacToeGrid.style.display = 'none';
+                toggleGameBtn.textContent = "Jugar Tres en Raya";
+            }
+        });
+
+        // Controles móviles
+        const mobileControls = ['upBtn', 'leftBtn', 'rightBtn', 'downBtn'];
+        mobileControls.forEach(id => {
+            const btn = document.getElementById(id);
+            btn.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                keys[`Arrow${id.charAt(0).toUpperCase() + id.slice(1, -3)}`] = true;
+            });
+            btn.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                keys[`Arrow${id.charAt(0).toUpperCase() + id.slice(1, -3)}`] = false;
+            });
         });
 
         // Iniciar el juego
